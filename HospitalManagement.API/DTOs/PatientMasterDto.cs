@@ -37,8 +37,17 @@
 
     }
 
+    public sealed class PatientCreateDto
+    {
+        public string Mrn { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public DateOnly? Dob { get; set; }
+        public string? Gender { get; set; }
+        public string? Phone { get; set; }
+        public string? Address { get; set; }
+        public bool Status { get; set; } = true;
+    }
 
-    
     public sealed class PatientUpdateDto
     {
         public string FullName { get; set; } = "";

@@ -193,13 +193,32 @@ public class PatientsController : ControllerBase
     }
 
     // CREATE
+    // PatientsController.cs  (API)
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] Patient model)
+    public async Task<ActionResult<int>> Create([FromBody] PatientCreateDto model)
     {
-        await _uow.Repository<Patient>().AddAsync(model);
+        if (await _db.Patients.AnyAsync(x => x.Mrn == model.Mrn))
+            return Conflict($"MRN '{model.Mrn}' already exists.");
+
+        var entity = new Patient
+        {
+            Mrn = model.Mrn,
+            FullName = model.FullName,
+            Dob = model.Dob,
+            Gender = model.Gender,
+            Phone = model.Phone,
+            Address = model.Address,
+            Status = model.Status,
+            CreatedUtc = DateTime.UtcNow      // <<< IMPORTANT: avoid SQL datetime out-of-range
+        };
+
+        await _uow.Repository<Patient>().AddAsync(entity);
         await _uow.SaveAsync();
-        return CreatedAtAction(nameof(Get), new { id = model.PatientId }, model.PatientId);
+
+        // Option B: return just the id
+        return CreatedAtAction(nameof(Get), new { id = entity.PatientId }, entity.PatientId);
     }
+
 
     // UPDATE (basic-edit only)
     [HttpPut("{id:int}")]
