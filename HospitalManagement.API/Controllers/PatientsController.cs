@@ -175,17 +175,17 @@ public class PatientsController : ControllerBase
                 Dob = p.Dob,
                 Gender = p.Gender,
                 Phone = p.Phone,
-                Address = p.Address,
+                Address = p.Address
 
-                // last appointment date only (for display)
-                LatestVisitTime = _db.Appointments
-                    .Where(a => a.PatientId == p.PatientId)
-                    .Max(a => (DateTime?)a.VisitDateTime),
+                //// last appointment date only (for display)
+                //LatestVisitTime = _db.Appointments
+                //    .Where(a => a.PatientId == p.PatientId)
+                //    .Max(a => (DateTime?)a.VisitDateTime),
 
-                // last billing date only (for display)
-                Last_BillingDate = _db.Billings
-                    .Where(b => b.PatientId == p.PatientId)
-                    .Max(b => (DateTime?)b.CreatedUtc) ?? default
+                //// last billing date only (for display)
+                //Last_BillingDate = _db.Billings
+                //    .Where(b => b.PatientId == p.PatientId)
+                //    .Max(b => (DateTime?)b.CreatedUtc) ?? default
             })
             .FirstOrDefaultAsync();
 

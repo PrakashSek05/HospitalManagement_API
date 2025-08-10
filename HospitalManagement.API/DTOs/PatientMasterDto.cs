@@ -32,8 +32,8 @@
         public DateOnly? Dob { get; set; }
         public string? Gender { get; set; }
         public string? Address { get; set; }
-        public DateTime Last_BillingDate { get; set; }
-        public DateTime? LatestVisitTime { get; set; }
+        //public DateTime Last_BillingDate { get; set; }
+        //public DateTime? LatestVisitTime { get; set; }
 
     }
 
