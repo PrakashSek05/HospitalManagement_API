@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using HospitalManagement.API.Dtos;
 using HospitalManagement.Core.Repositories;
+using HospitalManagement.Infrastructure;
 using HospitalManagement.Infrastructure.Entities;
-using HospitalManagement.API.Dtos;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 [ApiController]
@@ -9,58 +10,186 @@ using Microsoft.EntityFrameworkCore;
 public class AppointmentsController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
+    private readonly HospitalDbContext _db;
 
-    public AppointmentsController(IUnitOfWork uow)
+    public AppointmentsController(IUnitOfWork uow, HospitalDbContext db)
     {
         _uow = uow;
+        _db = db;
     }
 
     // GET: api/appointments
+    // Master list — returns AppointmentMasterDto
+    // GET: api/appointments
+    // GET: api/appointments
     [HttpGet]
-    public async Task<IActionResult> GetAll() =>
-        Ok(await _uow.Repository<Appointment>().GetAllAsync());
+    public async Task<IActionResult> GetAll()
+    {
+        var data = await _db.Appointments
+            .AsNoTracking()
+            .Select(a => new AppointmentMasterDto
+            {
+                AppointmentId = a.AppointmentId,
+                PatientId = a.PatientId,
+                PatientName = a.Patient.FullName,
+                DoctorId = a.DoctorId,
+                DoctorName = a.Doctor.FullName,
+
+                // entity VisitDateTime is non-nullable
+                VisitDateTime = a.VisitDateTime,      // DTO is DateTime?; implicit upcast is fine
+
+                Status = a.Status,
+                IsEdit = !(a.Status != null && a.Status.Equals("Complete", StringComparison.OrdinalIgnoreCase)),
+
+                // order by concrete DateTime; project as nullable
+                LastVisitDateTime = _db.Appointments
+                    .Where(x => x.PatientId == a.PatientId)
+                    .OrderByDescending(x => x.VisitDateTime)
+                    .Select(x => (DateTime?)x.VisitDateTime)
+                    .FirstOrDefault(),
+
+                LastDoctorName = _db.Appointments
+                    .Where(x => x.PatientId == a.PatientId)
+                    .OrderByDescending(x => x.VisitDateTime)
+                    .Select(x => x.Doctor.FullName)
+                    .FirstOrDefault(),
+
+                Reason = a.Reason
+            })
+            .ToListAsync();
+
+        return Ok(data);
+    }
+
+
+
+    // GET: api/appointments/5
+    // Return a single AppointmentMasterDto by id
 
     // GET: api/appointments/5
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id)
     {
-        var entity = await _uow.Repository<Appointment>().GetByIdAsync(id);
-        return entity is null ? NotFound() : Ok(entity);
+        var dto = await _db.Appointments
+            .AsNoTracking()
+            .Where(a => a.AppointmentId == id)
+            .Select(a => new AppointmentMasterDto
+            {
+                AppointmentId = a.AppointmentId,
+                PatientId = a.PatientId,
+                PatientName = a.Patient.FullName,
+                DoctorId = a.DoctorId,
+                DoctorName = a.Doctor.FullName,
+
+                VisitDateTime = a.VisitDateTime,    // non-nullable entity -> nullable DTO
+
+                Status = a.Status,
+                IsEdit = !(a.Status != null && a.Status.Equals("Complete", StringComparison.OrdinalIgnoreCase)),
+
+                LastVisitDateTime = _db.Appointments
+                    .Where(x => x.PatientId == a.PatientId)
+                    .OrderByDescending(x => x.VisitDateTime)
+                    .Select(x => (DateTime?)x.VisitDateTime)
+                    .FirstOrDefault(),
+
+                LastDoctorName = _db.Appointments
+                    .Where(x => x.PatientId == a.PatientId)
+                    .OrderByDescending(x => x.VisitDateTime)
+                    .Select(x => x.Doctor.FullName)
+                    .FirstOrDefault(),
+
+                Reason = a.Reason
+            })
+            .FirstOrDefaultAsync();
+
+        return dto is null ? NotFound() : Ok(dto);
     }
 
-    // (Optional) GET: api/appointments/by-patient/12
-    [HttpGet("by-patient/{patientId:int}")]
-    public async Task<IActionResult> GetByPatient(int patientId)
+
+    // GET: api/appointments/filter?patientId=12&doctorId=7&onlyOpen=true
+    // Unified filter by patientId and/or doctorId; optional onlyOpen (Status != Complete)
+    // GET: api/appointments/filter?patientId=12&doctorId=7&onlyOpen=true
+    [HttpGet("filter")]
+    public async Task<IActionResult> Filter([FromQuery] int? patientId, [FromQuery] int? doctorId, [FromQuery] bool onlyOpen = false)
     {
-        var list = await _uow.Repository<Appointment>()
-                              .FindAsync(a => a.PatientId == patientId);
+        var query = _db.Appointments.AsNoTracking().AsQueryable();
+
+        if (patientId.HasValue) query = query.Where(a => a.PatientId == patientId.Value);
+        if (doctorId.HasValue) query = query.Where(a => a.DoctorId == doctorId.Value);
+        if (onlyOpen)
+            query = query.Where(a => a.Status == null || !a.Status.Equals("Complete", StringComparison.OrdinalIgnoreCase));
+
+        var list = await query
+            .OrderByDescending(a => a.VisitDateTime) // concrete DateTime
+            .Select(a => new AppointmentMasterDto
+            {
+                AppointmentId = a.AppointmentId,
+                PatientId = a.PatientId,
+                PatientName = a.Patient.FullName,
+                DoctorId = a.DoctorId,
+                DoctorName = a.Doctor.FullName,
+
+                VisitDateTime = a.VisitDateTime,   // project as nullable
+
+                Status = a.Status,
+                IsEdit = !(a.Status != null && a.Status.Equals("Complete", StringComparison.OrdinalIgnoreCase)),
+
+                LastVisitDateTime = _db.Appointments
+                    .Where(x => x.PatientId == a.PatientId)
+                    .OrderByDescending(x => x.VisitDateTime)
+                    .Select(x => (DateTime?)x.VisitDateTime)
+                    .FirstOrDefault(),
+
+                LastDoctorName = _db.Appointments
+                    .Where(x => x.PatientId == a.PatientId)
+                    .OrderByDescending(x => x.VisitDateTime)
+                    .Select(x => x.Doctor.FullName)
+                    .FirstOrDefault(),
+
+                Reason = a.Reason
+            })
+            .ToListAsync();
+
         return Ok(list);
     }
 
-    // (Optional) GET: api/appointments/by-doctor/7
-    [HttpGet("by-doctor/{doctorId:int}")]
-    public async Task<IActionResult> GetByDoctor(int doctorId)
-    {
-        var list = await _uow.Repository<Appointment>()
-                              .FindAsync(a => a.DoctorId == doctorId);
-        return Ok(list);
-    }
 
-    // POST: api/appointments
     [HttpPost]
-    public async Task<IActionResult> Create(Appointment model)
-    {
-        await _uow.Repository<Appointment>().AddAsync(model);
+    public async Task<IActionResult> Create([FromBody] AppointmentEditDto dto)
+    {        
+
+        var entity = new Appointment
+        {
+            PatientId = dto.PatientId,
+            DoctorId = dto.DoctorId,
+            VisitDateTime = dto.VisitDateTime,
+            Status = dto.Status,
+            Reason = dto.Reason,
+            CreatedUtc = DateTime.UtcNow
+        };
+
+        await _uow.Repository<Appointment>().AddAsync(entity);
         await _uow.SaveAsync();
-        return CreatedAtAction(nameof(Get), new { id = model.AppointmentId }, model);
+        return CreatedAtAction(nameof(Get), new { id = entity.AppointmentId }, entity.AppointmentId);
     }
 
-    // PUT: api/appointments/5
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, Appointment model)
+    public async Task<IActionResult> Update(int id, [FromBody] AppointmentEditDto dto)
     {
-        if (id != model.AppointmentId) return BadRequest(); // adjust if PK name differs
-        _uow.Repository<Appointment>().Update(model);
+        if (id != dto.AppointmentId)
+            return BadRequest("Route id and body id mismatch.");        
+
+        var repo = _uow.Repository<Appointment>();
+        var entity = await repo.GetByIdAsync(id);
+        if (entity is null) return NotFound();
+
+        entity.PatientId = dto.PatientId;
+        entity.DoctorId = dto.DoctorId;
+        entity.VisitDateTime = dto.VisitDateTime;
+        entity.Status = dto.Status;
+        entity.Reason = dto.Reason;
+        entity.UpdatedUtc = DateTime.UtcNow;
+
         await _uow.SaveAsync();
         return NoContent();
     }
@@ -72,110 +201,8 @@ public class AppointmentsController : ControllerBase
         var repo = _uow.Repository<Appointment>();
         var entity = await repo.GetByIdAsync(id);
         if (entity is null) return NotFound();
-
         repo.Delete(entity);
         await _uow.SaveAsync();
         return NoContent();
-    }
-
-    [HttpGet("master")]
-    public async Task<IActionResult> GetMaster([FromServices] HospitalManagement.Infrastructure.HospitalDbContext db)
-    {
-        var data = await db.Appointments
-       .AsNoTracking()
-       .Select(a => new AppointmentMasterDto
-       {
-           AppointmentId = a.AppointmentId,
-           PatientId = a.PatientId,
-           PatientName = a.Patient.FullName,
-           DoctorId = a.DoctorId,
-           DoctorName = a.Doctor.FullName,
-           VisitDateTime = a.CreatedUtc,
-
-           Status = a.Status,           
-           IsEdit = !(a.Status != null &&
-                                 a.Status.Equals("Complete", StringComparison.OrdinalIgnoreCase)),
-           
-           LastVisitDateTime = db.Appointments
-               .Where(x => x.PatientId == a.PatientId)
-               .OrderByDescending(x => x.CreatedUtc)
-               .Select(x => (DateTime?)x.CreatedUtc)
-               .FirstOrDefault(),
-
-           LastDoctorName = db.Appointments
-               .Where(x => x.PatientId == a.PatientId)
-               .OrderByDescending(x => x.CreatedUtc)
-               .Select(x => x.Doctor.FullName)
-               .FirstOrDefault()
-       })
-       .ToListAsync();
-
-
-        return Ok(data);
-    }
-
-    [HttpGet("{id:int}/details")]
-    public async Task<IActionResult> GetDetails(int id, [FromServices] HospitalManagement.Infrastructure.HospitalDbContext db)
-    {
-        var dto = await db.Appointments
-            .AsNoTracking()
-            .Where(a => a.AppointmentId == id)
-            .Select(a => new AppointmentDetailDto
-            {
-                AppointmentId = a.AppointmentId,
-                PatientId = a.PatientId,
-                PatientName = a.Patient.FullName,      // adjust if different
-                DoctorId = a.DoctorId,
-                DoctorName = a.Doctor.FullName,       // adjust if different
-                VisitDateTime = a.CreatedUtc,
-
-                // patient’s latest visit overall
-                LastVisitDateTime = db.Appointments
-                    .Where(x => x.PatientId == a.PatientId)
-                    .OrderByDescending(x => x.CreatedUtc)
-                    .Select(x => (DateTime?)x.CreatedUtc)
-                    .FirstOrDefault(),
-
-                LastDoctorName = db.Appointments
-                    .Where(x => x.PatientId == a.PatientId)
-                    .OrderByDescending(x => x.CreatedUtc)
-                    .Select(x => x.Doctor.FullName)
-                    .FirstOrDefault(),
-
-                // latest history for THIS appointment (reason/type/details)
-                Reason = db.Appointments
-                    .Where(h => h.PatientId == a.PatientId)
-                    .OrderByDescending(h => h.CreatedUtc)
-                    .Select(h => h.Reason)                 // adjust property name if needed
-                    .FirstOrDefault(),
-
-                Type = db.PatientHistories
-                    .Where(h => h.AppointmentId == a.AppointmentId)
-                    .OrderByDescending(h => h.CreatedUtc)
-                    .Select(h => h.Type)                   // adjust property name if needed
-                    .FirstOrDefault(),
-
-                Details = db.PatientHistories
-                    .Where(h => h.AppointmentId == a.AppointmentId)
-                    .OrderByDescending(h => h.CreatedUtc)
-                    .Select(h => h.Details)                // adjust property name if needed
-                    .FirstOrDefault(),
-
-                // all attachments for THIS appointment (via history)
-                Attachments = db.PatientHistoryAttachments
-                    .Where(att => att.History.AppointmentId == a.AppointmentId)
-                    .OrderByDescending(att => att.UploadedUtc)
-                    .Select(att => new AttachmentDto
-                    {
-                        AttachmentId = att.AttachmentId,
-                        FileName = att.FileName,       // adjust column name if different
-                        UploadedUtc = att.UploadedUtc,
-                        Notes = att.Notes           // adjust if you have a notes/desc column
-                    })
-                    .ToList()
-            })
-            .FirstOrDefaultAsync();
-
-        return dto is null ? NotFound() : Ok(dto);
     }
 }

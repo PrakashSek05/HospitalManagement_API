@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using HospitalManagement.Infrastructure.Entities;
+using HospitalManagement.Core.DTOs;
 
 namespace HospitalManagement.Infrastructure
 {
@@ -14,8 +15,7 @@ namespace HospitalManagement.Infrastructure
         public HospitalDbContext(DbContextOptions<HospitalDbContext> options)
             : base(options)
         {
-        }
-
+        }        
         public virtual DbSet<Appointment> Appointments { get; set; }
         public virtual DbSet<BillItem> BillItems { get; set; }
         public virtual DbSet<Billing> Billings { get; set; }

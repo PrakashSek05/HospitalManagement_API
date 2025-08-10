@@ -16,28 +16,30 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<ICommonService, CommonService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 // JWT options from config
-builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
-var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()!;
-var key = Encoding.UTF8.GetBytes(jwtOptions.Key);
+//builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+//var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()!;
+//var key = Encoding.UTF8.GetBytes(jwtOptions.Key);
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtOptions.Issuer,
-            ValidAudience = jwtOptions.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(key)
-        };
-    });
+//builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+//    .AddJwtBearer(options =>
+//    {
+//        options.TokenValidationParameters = new TokenValidationParameters
+//        {
+//            ValidateIssuer = true,
+//            ValidateAudience = true,
+//            ValidateLifetime = true,
+//            ValidateIssuerSigningKey = true,
+//            ValidIssuer = jwtOptions.Issuer,
+//            ValidAudience = jwtOptions.Audience,
+//            IssuerSigningKey = new SymmetricSecurityKey(key)
+//        };
+//    });
 
-builder.Services.AddScoped<ITokenService, TokenService>();
+//builder.Services.AddScoped<ITokenService, TokenService>();
 
 builder.Services.AddDbContext<HospitalDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("Default")));

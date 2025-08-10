@@ -19,8 +19,4 @@
     <ProjectReference Include="..\HospitalManagement.Core\HospitalManagement.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Entities\" />
-  </ItemGroup>
-
 </Project>
