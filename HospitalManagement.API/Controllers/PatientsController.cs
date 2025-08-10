@@ -209,13 +209,12 @@ public class PatientsController : ControllerBase
             Phone = model.Phone,
             Address = model.Address,
             Status = model.Status,
-            CreatedUtc = DateTime.UtcNow      // <<< IMPORTANT: avoid SQL datetime out-of-range
+            CreatedUtc = DateTime.UtcNow     
         };
 
         await _uow.Repository<Patient>().AddAsync(entity);
         await _uow.SaveAsync();
-
-        // Option B: return just the id
+        
         return CreatedAtAction(nameof(Get), new { id = entity.PatientId }, entity.PatientId);
     }
 
